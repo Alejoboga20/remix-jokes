@@ -1,6 +1,6 @@
 import type { ActionArgs } from '@remix-run/node';
 import { redirect } from '@remix-run/node';
-import { useActionData } from '@remix-run/react';
+import { Form, useActionData } from '@remix-run/react';
 import { db } from '~/utils/db.server';
 import { badRequest } from '~/utils/request.server';
 import { requireUserId } from '~/utils/session.server';
@@ -61,7 +61,7 @@ const NewJokeRoute = () => {
 	return (
 		<div>
 			<p>Add your own hilarious joke</p>
-			<form method='post'>
+			<Form method='post'>
 				<div>
 					<label>
 						Name:{' '}
@@ -105,7 +105,7 @@ const NewJokeRoute = () => {
 						Add
 					</button>
 				</div>
-			</form>
+			</Form>
 		</div>
 	);
 };
