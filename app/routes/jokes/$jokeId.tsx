@@ -2,15 +2,23 @@ import type { LoaderArgs } from '@remix-run/node';
 import { json } from '@remix-run/node';
 import { db } from '~/utils/db.server';
 import { Link, useLoaderData, useParams } from '@remix-run/react';
+import { JokeDisplay } from '~/components/joke';
+import { getUserId } from '~/utils/session.server';
 
-export const loader = async ({ params }: LoaderArgs) => {
-	const joke = await db.joke.findUnique({ where: { id: params.jokeId } });
-
+export const loader = async ({ params, request }: LoaderArgs) => {
+	const userId = await getUserId(request);
+	const joke = await db.joke.findUnique({
+		where: { id: params.jokeId },
+	});
 	if (!joke) {
-		throw new Error('joke not found');
+		throw new Response('What a joke! Not found.', {
+			status: 404,
+		});
 	}
-
-	return json({ joke });
+	return json({
+		joke,
+		isOwner: userId === joke.jokesterId,
+	});
 };
 
 export const ErrorBoundary = () => {
@@ -24,13 +32,7 @@ export const ErrorBoundary = () => {
 const JokeRoute = () => {
 	const data = useLoaderData<typeof loader>();
 
-	return (
-		<div>
-			<p>Here's your hilarious joke:</p>
-			<p>{data.joke.content}</p>
-			<Link to='.'>{data.joke.name} Permalink</Link>
-		</div>
-	);
+	return <JokeDisplay isOwner={data.isOwner} joke={data.joke} />;
 };
 
 export default JokeRoute;

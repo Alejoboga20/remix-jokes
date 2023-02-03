@@ -1,28 +1,37 @@
-import type { ActionArgs } from '@remix-run/node';
-import { redirect } from '@remix-run/node';
-import { Form, useActionData } from '@remix-run/react';
+import type { ActionArgs, LoaderArgs } from '@remix-run/node';
+import { json, redirect } from '@remix-run/node';
+import { Form, Link, useActionData, useCatch, useNavigation } from '@remix-run/react';
+
+import { JokeDisplay } from '~/components/joke';
 import { db } from '~/utils/db.server';
 import { badRequest } from '~/utils/request.server';
-import { requireUserId } from '~/utils/session.server';
+import { getUserId, requireUserId } from '~/utils/session.server';
 
-const validateJokeContent = (content: string) => {
+export const loader = async ({ request }: LoaderArgs) => {
+	const userId = await getUserId(request);
+	if (!userId) {
+		throw new Response('Unauthorized', { status: 401 });
+	}
+	return json({});
+};
+
+function validateJokeContent(content: string) {
 	if (content.length < 10) {
 		return `That joke is too short`;
 	}
-};
+}
 
-const validateJokeName = (name: string) => {
+function validateJokeName(name: string) {
 	if (name.length < 3) {
 		return `That joke's name is too short`;
 	}
-};
+}
 
 export const action = async ({ request }: ActionArgs) => {
 	const userId = await requireUserId(request);
 	const form = await request.formData();
 	const name = form.get('name');
 	const content = form.get('content');
-
 	if (typeof name !== 'string' || typeof content !== 'string') {
 		return badRequest({
 			fieldErrors: null,
@@ -31,13 +40,11 @@ export const action = async ({ request }: ActionArgs) => {
 		});
 	}
 
-	const fields = { name, content };
-
 	const fieldErrors = {
 		name: validateJokeName(name),
 		content: validateJokeContent(content),
 	};
-
+	const fields = { name, content };
 	if (Object.values(fieldErrors).some(Boolean)) {
 		return badRequest({
 			fieldErrors,
@@ -46,17 +53,28 @@ export const action = async ({ request }: ActionArgs) => {
 		});
 	}
 
-	const joke = await db.joke.create({ data: { ...fields, jokesterId: userId } });
-
+	const joke = await db.joke.create({
+		data: { ...fields, jokesterId: userId },
+	});
 	return redirect(`/jokes/${joke.id}`);
 };
 
-export const ErrorBoundary = () => {
-	return <div className='error-container'>Something unexpected went wrong</div>;
-};
-
-const NewJokeRoute = () => {
+export default function NewJokeRoute() {
 	const actionData = useActionData<typeof action>();
+	const navigation = useNavigation();
+
+	if (navigation.formData) {
+		const name = navigation.formData.get('name');
+		const content = navigation.formData.get('content');
+		if (
+			typeof name === 'string' &&
+			typeof content === 'string' &&
+			!validateJokeContent(content) &&
+			!validateJokeName(name)
+		) {
+			return <JokeDisplay joke={{ name, content }} isOwner={true} canDelete={false} />;
+		}
+	}
 
 	return (
 		<div>
@@ -67,8 +85,8 @@ const NewJokeRoute = () => {
 						Name:{' '}
 						<input
 							type='text'
-							name='name'
 							defaultValue={actionData?.fields?.name}
+							name='name'
 							aria-invalid={Boolean(actionData?.fieldErrors?.name) || undefined}
 							aria-errormessage={actionData?.fieldErrors?.name ? 'name-error' : undefined}
 						/>
@@ -108,6 +126,21 @@ const NewJokeRoute = () => {
 			</Form>
 		</div>
 	);
-};
+}
 
-export default NewJokeRoute;
+export function CatchBoundary() {
+	const caught = useCatch();
+
+	if (caught.status === 401) {
+		return (
+			<div className='error-container'>
+				<p>You must be logged in to create a joke.</p>
+				<Link to='/login'>Login</Link>
+			</div>
+		);
+	}
+}
+
+export function ErrorBoundary() {
+	return <div className='error-container'>Something unexpected went wrong. Sorry about that.</div>;
+}
