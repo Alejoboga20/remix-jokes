@@ -51,6 +51,10 @@ export const action = async ({ request }: ActionArgs) => {
 	return redirect(`/jokes/${joke.id}`);
 };
 
+export const ErrorBoundary = () => {
+	return <div className='error-container'>Something unexpected went wrong</div>;
+};
+
 const NewJokeRoute = () => {
 	const actionData = useActionData<typeof action>();
 
